@@ -1,0 +1,217 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+env:
+  CARGO_TERM_COLOR: always
+  RUSTFLAGS: -D warnings
+
+jobs:
+  test:
+    name: test (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    steps:
+      - uses: actions/checkout@v5
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - name: Test with default features
+        run: cargo test --workspace
+      - name: libjpeg-turbo, for the `libjpeg` feature
+        run: |
+          if [ "$RUNNER_OS" = "Linux" ]; then sudo apt-get update -qq && sudo apt-get install -y nasm
+          else brew install jpeg-turbo; echo "PKG_CONFIG_PATH=$(brew --prefix jpeg-turbo)/lib/pkgconfig" >> "$GITHUB_ENV"; fi
+      - name: Test with every feature
+        run: cargo test --workspace --all-features
+      - name: Test the library with no optional features
+        run: cargo test -p webdataset --no-default-features
+      - name: Benchmarks compile
+        run: cargo bench -p webdataset --no-run
+
+  features:
+    name: feature combinations
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - name: Archive reader without a read-ahead thread
+        run: cargo test -p webdataset-shard --no-default-features
+      - name: URL opening without subprocesses
+        run: cargo test -p webdataset-io --no-default-features
+      - name: Each compression container
+        run: |
+          for feature in zstd bzip2 xz; do
+            cargo test -p webdataset-shard --features "$feature"
+          done
+      - name: The async pipeline, and that it agrees with the blocking one
+        run: |
+          cargo test -p webdataset-shard --features async
+          cargo test -p webdataset --features async,image,msgpack
+
+  no_std:
+    name: no_std
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: thumbv7em-none-eabi
+      - uses: Swatinem/rust-cache@v2
+      - name: Core and tenbin without std, on the host
+        run: |
+          cargo test -p webdataset-core --no-default-features --features json
+          cargo test -p webdataset-core --no-default-features --features json,threads
+          cargo test -p webdataset-tenbin --no-default-features
+      - name: Core and tenbin on a bare-metal target
+        run: |
+          cargo check -p webdataset-core --no-default-features --target thumbv7em-none-eabi
+          cargo check -p webdataset-core --no-default-features --features json --target thumbv7em-none-eabi
+          cargo check -p webdataset-core --no-default-features --features json,threads --target thumbv7em-none-eabi
+          cargo check -p webdataset-tenbin --no-default-features --target thumbv7em-none-eabi
+
+  wasm:
+    name: WebAssembly
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-unknown-unknown, wasm32-wasip1
+      - uses: Swatinem/rust-cache@v2
+      - name: Browser target
+        run: |
+          cargo check -p webdataset --target wasm32-unknown-unknown \
+            --no-default-features --features yaml,wasm-js,image,npz,msgpack,cbor
+      - name: Browser target, async
+        run: |
+          cargo check -p webdataset --target wasm32-unknown-unknown \
+            --no-default-features --features async,wasm-js,image
+      - name: WASI target
+        run: cargo check -p webdataset --target wasm32-wasip1 --no-default-features --features yaml
+      - name: The pipeline shape WebAssembly uses, run on the host
+        run: cargo test -p webdataset --no-default-features --test portable
+
+  parity:
+    name: parity with the Python implementation
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+      - name: Install the reference implementation
+        run: pip install webdataset numpy pillow msgpack torch --quiet
+      - name: nasm, for the `libjpeg` feature
+        run: sudo apt-get update -qq && sudo apt-get install -y nasm
+      - name: Build the dumper
+        run: cargo build --release -p webdataset-tools --features libjpeg
+      - name: Compare every shard and decode mode
+        run: python parity/run_parity.py
+
+  python:
+    name: python bindings
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+      # `maturin develop` needs a virtualenv, which `setup-python` does not
+      # provide. Building the wheel and installing it needs none, and it tests
+      # the artifact users actually get — including the `auditwheel = "repair"`
+      # step that bundles libjpeg-turbo into it.
+      - name: Build and install the package
+        run: |
+          sudo apt-get update -qq && sudo apt-get install -y nasm
+          pip install maturin pytest numpy pillow
+          maturin build --release -m crates/webdataset-python/Cargo.toml --out dist
+          pip install dist/*.whl
+      - name: Check the bindings lint cleanly
+        run: cd crates/webdataset-python && cargo clippy --all-targets
+      - name: Test the drop-in API
+        run: pytest crates/webdataset-python/tests -q
+
+  drop_in:
+    name: drop-in parity with the reference library
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+      - name: Two environments, one for each implementation
+        run: |
+          sudo apt-get update -qq && sudo apt-get install -y nasm
+          python -m venv /tmp/reference && /tmp/reference/bin/pip install -q webdataset numpy pillow msgpack torch cbor
+          python -m venv /tmp/rust && /tmp/rust/bin/pip install -q maturin pytest numpy pillow cbor
+          # The comparison drivers run on this interpreter, deliberately kept
+          # clear of either implementation so neither can be imported by
+          # accident. `jpeg_divergence` compares pixels, so it needs numpy --
+          # and only numpy.
+          pip install -q numpy
+          cd crates/webdataset-python && VIRTUAL_ENV=/tmp/rust /tmp/rust/bin/maturin develop --release
+      - name: A lossless corpus covering every decoder
+        run: |
+          /tmp/reference/bin/python bench/make_corpus.py /tmp/corpus-png \
+            --shards 2 --per-shard 64 --format png --extras
+      - name: Compare every pipeline through the public API
+        run: |
+          python parity/run_api_parity.py \
+            --reference /tmp/reference/bin/python --rust /tmp/rust/bin/python \
+            --url '/tmp/corpus-png/bench-{000000..000001}.tar' --image png
+      - name: Hold the two JPEG decoders to a bound
+        run: |
+          python parity/jpeg_divergence.py \
+            --reference /tmp/reference/bin/python --rust /tmp/rust/bin/python \
+            --url testdata/ixtest.tar --limit 10 --max-difference 4
+      - name: The same checks as assertions, so a regression fails the suite
+        run: |
+          /tmp/rust/bin/pip install -q pytest
+          cargo build --release -p webdataset-tools --features libjpeg
+          WDS_REFERENCE_PYTHON=/tmp/reference/bin/python \
+            /tmp/rust/bin/python -m pytest crates/webdataset-python/tests/test_parity.py -q
+
+  lint:
+    name: format, clippy and docs
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+      - uses: Swatinem/rust-cache@v2
+      - name: Python lint and format
+        run: |
+          pip install ruff
+          ruff check crates/webdataset-python/python crates/webdataset-python/tests parity bench
+          ruff format --check crates/webdataset-python/python crates/webdataset-python/tests parity bench
+      - run: cargo fmt --all --check
+      - name: nasm, for the `libjpeg` feature
+        run: sudo apt-get update -qq && sudo apt-get install -y nasm
+      - run: cargo clippy --workspace --all-features --all-targets
+      - run: cargo doc --workspace --all-features --no-deps
+        env:
+          RUSTDOCFLAGS: -D warnings
+
+  msrv:
+    name: minimum supported Rust version
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: dtolnay/rust-toolchain@1.85.0
+      - uses: Swatinem/rust-cache@v2
+      - run: sudo apt-get update -qq && sudo apt-get install -y nasm
+      - run: cargo check --workspace --all-features

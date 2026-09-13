@@ -1,0 +1,45 @@
+[build-system]
+requires = ["maturin>=1.5,<2.0"]
+build-backend = "maturin"
+
+[project]
+name = "webdataset"
+description = "High-performance sequential dataset loading, backed by webdataset-rs"
+readme = "README.md"
+requires-python = ">=3.9"
+license = { text = "BSD-3-Clause" }
+authors = [{ name = "The webdataset-rs authors" }]
+keywords = ["webdataset", "dataset", "dataloader", "machine-learning", "tar"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Science/Research",
+    "License :: OSI Approved :: BSD License",
+    "Programming Language :: Rust",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: Implementation :: CPython",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+    "Topic :: System :: Archiving",
+]
+dependencies = ["numpy", "braceexpand"]
+dynamic = ["version"]
+
+[project.optional-dependencies]
+image = ["pillow"]
+
+[project.urls]
+Homepage = "https://github.com/eugenehp/webdataset-rs"
+Repository = "https://github.com/eugenehp/webdataset-rs"
+Changelog = "https://github.com/eugenehp/webdataset-rs/blob/main/CHANGELOG.md"
+
+[tool.maturin]
+module-name = "webdataset._native"
+python-source = "python"
+manifest-path = "Cargo.toml"
+# `libjpeg` makes JPEG decoding bit-identical to Pillow, which is the point
+# of a drop-in replacement. It needs libjpeg-turbo findable by pkg-config.
+features = ["extension-module", "libjpeg"]
+# `libjpeg` links libjpeg-turbo, and the `xz` feature links liblzma. Both are
+# system libraries, so an unrepaired wheel would carry absolute paths into them
+# and fail to import anywhere those paths do not exist. Repairing copies them
+# into the wheel and rewrites the references to be relative to it.
+auditwheel = "repair"

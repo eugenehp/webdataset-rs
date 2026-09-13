@@ -1,0 +1,44 @@
+[package]
+name = "webdataset-core"
+description = "Core data model (samples, values, tensors, handlers) for the webdataset format"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+homepage.workspace = true
+authors.workspace = true
+keywords.workspace = true
+categories.workspace = true
+readme = "README.md"
+
+[dependencies]
+bytes = { workspace = true, default-features = false }
+indexmap = { workspace = true, default-features = false }
+log.workspace = true
+thiserror = { workspace = true, default-features = false }
+
+image = { workspace = true, optional = true }
+once_cell = { version = "1", optional = true, default-features = false, features = ["alloc", "race"] }
+serde_json = { workspace = true, optional = true, default-features = false, features = ["alloc"] }
+
+[features]
+default = ["std", "json", "threads"]
+## Use the standard library: filesystem errors, environment variables,
+## thread-local worker identity. Turn it off for a `no_std` build, which needs
+## only `alloc`.
+std = ["bytes/std", "indexmap/std", "serde_json?/std", "thiserror/std"]
+## Convert between [`Value`] and `serde_json::Value`.
+json = ["dep:serde_json"]
+## Keep per-worker state per thread rather than per program. Needs no setup
+## with `std`; without it, see [`workers::set_thread_id_hook`].
+threads = ["dep:once_cell"]
+## Add an `image` variant to [`Value`], backed by the `image` crate.
+image = ["dep:image", "std"]
+
+[lints]
+workspace = true
+
+[package.metadata.docs.rs]
+all-features = true
+rustdoc-args = ["--cfg", "docsrs"]

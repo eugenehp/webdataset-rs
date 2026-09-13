@@ -1,0 +1,32 @@
+[package]
+name = "webdataset-cli"
+description = "Command line tools for inspecting and reshaping webdataset shards"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+homepage.workspace = true
+authors.workspace = true
+keywords.workspace = true
+categories = ["command-line-utilities", "science"]
+readme = "README.md"
+
+[[bin]]
+name = "wds"
+path = "src/main.rs"
+
+[dependencies]
+webdataset = { workspace = true, features = ["full"] }
+clap.workspace = true
+serde_json = { workspace = true, features = ["std"] }
+
+[dev-dependencies]
+tempfile.workspace = true
+
+[lints]
+workspace = true
+
+[package.metadata.docs.rs]
+all-features = true
+rustdoc-args = ["--cfg", "docsrs"]

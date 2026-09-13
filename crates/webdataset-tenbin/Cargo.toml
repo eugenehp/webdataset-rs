@@ -1,0 +1,29 @@
+[package]
+name = "webdataset-tenbin"
+description = "The tenbin (.ten) 8-byte-aligned binary tensor format used by webdataset"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+homepage.workspace = true
+authors.workspace = true
+keywords.workspace = true
+categories.workspace = true
+readme = "README.md"
+
+[dependencies]
+webdataset-core = { workspace = true, default-features = false }
+
+[features]
+default = ["std"]
+## Use the standard library: stream and file helpers, and `std::io` errors.
+## Without it only the in-memory encode and decode functions are available.
+std = ["webdataset-core/std"]
+
+[lints]
+workspace = true
+
+[package.metadata.docs.rs]
+all-features = true
+rustdoc-args = ["--cfg", "docsrs"]

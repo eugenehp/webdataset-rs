@@ -1,0 +1,21 @@
+[package]
+name = "webdataset-tools"
+description = "Internal tooling for the webdataset-rs repository; not published"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish = false
+
+[dependencies]
+webdataset = { workspace = true, features = ["full"] }
+# Used directly to reshape a decoded image into the array NumPy would see.
+image.workspace = true
+
+[features]
+default = []
+## Decode JPEG through libjpeg-turbo, so the parity dump matches Pillow.
+libjpeg = ["webdataset/libjpeg"]
+
+[lints]
+workspace = true

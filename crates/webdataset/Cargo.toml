@@ -1,0 +1,111 @@
+[package]
+name = "webdataset"
+description = "High-performance sequential dataset loading from tar archives, in the WebDataset format"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+homepage.workspace = true
+authors.workspace = true
+keywords.workspace = true
+categories.workspace = true
+readme = "README.md"
+
+[dependencies]
+webdataset-core = { workspace = true, features = ["std", "json"] }
+webdataset-io.workspace = true
+webdataset-shard.workspace = true
+webdataset-tenbin = { workspace = true, features = ["std"] }
+
+bytes = { workspace = true, features = ["std"] }
+flate2.workspace = true
+glob.workspace = true
+indexmap = { workspace = true, features = ["std"] }
+log.workspace = true
+rand.workspace = true
+regex.workspace = true
+serde_json = { workspace = true, features = ["std"] }
+
+ciborium = { workspace = true, optional = true }
+image = { workspace = true, optional = true }
+rmp-serde = { workspace = true, optional = true }
+serde_yaml = { workspace = true, optional = true }
+# `pkg-config` uses the system libjpeg-turbo when it is new enough, and `cmake`
+# builds one from source when it is not. Distributions lag: Ubuntu 24.04 ships
+# 2.1.5 and `turbojpeg-sys` needs 3.0, so without the fallback this feature
+# cannot be built there at all.
+turbojpeg = { version = "1.5", optional = true, default-features = false, features = ["pkg-config", "cmake"] }
+# Held below 8.x, which requires Rust 1.88 and would break the 1.85 promise in
+# `rust-version`. Only four items are used, all unchanged across these majors,
+# so the ceiling costs nothing. The `msrv` CI job is what catches a bump.
+zip = { version = "7.1", optional = true, default-features = false, features = ["deflate"] }
+
+futures-core = { version = "0.3", optional = true, default-features = false, features = ["std"] }
+futures-io = { version = "0.3", optional = true }
+futures-util = { version = "0.3", optional = true, default-features = false, features = ["std", "io"] }
+
+[[bench]]
+name = "pipeline"
+harness = false
+
+[[example]]
+name = "async_pipeline"
+required-features = ["async"]
+
+[target.'cfg(target_arch = "wasm32")'.dependencies]
+getrandom = { version = "0.4", optional = true }
+
+[dev-dependencies]
+# Held below 0.8, which requires Rust 1.86. See the note on `zip`.
+criterion = { version = "0.7", default-features = false, features = ["cargo_bench_support"] }
+tempfile.workspace = true
+futures-channel = "0.3"
+futures-executor = "0.3"
+
+[features]
+default = ["yaml", "threads", "subprocess"]
+## Read each shard on a background thread and run the loader over a worker
+## pool. Turn it off for targets without threads, such as WebAssembly.
+threads = ["webdataset-core/threads", "webdataset-shard/threads"]
+## Open URLs by running a transfer tool (`curl`, `gsutil`, `ais`) and support
+## the `pipe:` scheme. Turn it off where subprocesses are unavailable.
+subprocess = ["webdataset-io/subprocess", "webdataset-shard/subprocess"]
+## Draw randomness from the JavaScript host on `wasm32-unknown-unknown`.
+wasm-js = ["dep:getrandom", "getrandom/wasm_js"]
+## Read shards from any `futures_io::AsyncRead` and build `Stream` pipelines.
+async = ["dep:futures-core", "dep:futures-io", "dep:futures-util", "webdataset-shard/async"]
+## Decode and encode images (`.jpg`, `.png`, ...).
+image = ["dep:image", "webdataset-core/image"]
+## Decode JPEG with libjpeg-turbo rather than the pure-Rust decoder.
+##
+## The JPEG standard fixes the transform but not the inverse DCT, so two
+## correct decoders can differ in the last bit. Pillow uses libjpeg-turbo; with
+## this feature so does webdataset, and the two agree exactly. The cost is a C
+## dependency: libjpeg-turbo must be installed and findable by pkg-config, and
+## the feature cannot be used on WebAssembly.
+libjpeg = ["dep:turbojpeg", "image"]
+## Decode and encode MessagePack (`.mp`, `.msg`).
+msgpack = ["dep:rmp-serde"]
+## Decode and encode CBOR (`.cbor`).
+cbor = ["dep:ciborium"]
+## Decode and encode NumPy `.npz` archives.
+npz = ["dep:zip"]
+## Read multi-source dataset specifications written in YAML.
+yaml = ["dep:serde_yaml"]
+## Read and write `.tar.zst` shards.
+zstd = ["webdataset-shard/zstd"]
+## Read and write `.tar.bz2` shards.
+bzip2 = ["webdataset-shard/bzip2"]
+## Read and write `.tar.xz` shards.
+xz = ["webdataset-shard/xz"]
+## Every optional format.
+full = ["image", "msgpack", "cbor", "npz", "yaml", "threads", "subprocess", "async", "zstd", "bzip2", "xz"]
+
+[lints]
+workspace = true
+
+[package.metadata.docs.rs]
+# Everything except `libjpeg`, which needs libjpeg-turbo present at build time.
+features = ["full"]
+rustdoc-args = ["--cfg", "docsrs"]

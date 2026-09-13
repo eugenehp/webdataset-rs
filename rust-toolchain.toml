@@ -1,0 +1,6 @@
+# Pinned so that `cargo fmt` and `cargo clippy` agree between contributors and
+# CI. The library itself supports Rust 1.85 and later; see `rust-version` in
+# the root Cargo.toml, which the MSRV job checks.
+[toolchain]
+channel = "stable"
+components = ["rustfmt", "clippy"]

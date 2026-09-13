@@ -1,0 +1,46 @@
+# Its own workspace; see the `exclude` in the root manifest for why.
+[workspace]
+
+[package]
+name = "webdataset-python"
+description = "Python bindings for webdataset-rs: a drop-in replacement for the Python webdataset library"
+version = "0.0.1"
+edition = "2024"
+rust-version = "1.85"
+license = "BSD-3-Clause"
+repository = "https://github.com/eugenehp/webdataset-rs"
+homepage = "https://github.com/eugenehp/webdataset-rs"
+authors = ["The webdataset-rs authors"]
+keywords = ["webdataset", "tar", "dataset", "machine-learning", "python"]
+categories = ["science", "api-bindings"]
+publish = false
+
+[lib]
+name = "_native"
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+# `libjpeg` is what makes JPEG decoding bit-identical to Pillow, which is the
+# whole point of a drop-in replacement. It needs libjpeg-turbo at build time.
+webdataset = { version = "0.0.1", path = "../webdataset", features = ["full"] }
+
+numpy = "0.29"
+pyo3 = { version = "0.29", features = ["abi3-py39"] }
+
+[features]
+default = []
+## Reflects `webdataset/libjpeg`, so the package can report whether JPEG
+## decoding is bit-identical to Pillow's.
+libjpeg = ["webdataset/libjpeg"]
+## Build as a Python extension module, which leaves the interpreter's symbols
+## to be resolved at load time. maturin turns this on; a plain `cargo build`
+## leaves it off so the crate links and tests like any other.
+extension-module = ["pyo3/extension-module"]
+
+[lints.rust]
+missing_docs = "warn"
+unsafe_code = "forbid"
+
+[profile.release]
+lto = "thin"
+codegen-units = 1

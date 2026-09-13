@@ -1,0 +1,28 @@
+# Linting for the Python package and the parity and benchmark tooling.
+line-length = 110
+target-version = "py39"
+
+# Recent ruff reads Python out of Markdown code blocks. The README examples are
+# documentation: a chained pipeline reads better broken across lines than
+# collapsed to the line limit, and the snippets are illustrative rather than
+# runnable modules. Leave them to the prose.
+extend-exclude = ["*.md"]
+
+[lint]
+select = ["F", "E", "W", "I", "UP", "B", "SIM", "RUF"]
+ignore = [
+    # `__all__` is grouped by topic rather than sorted, which reads better for
+    # a package whose surface mirrors another library's.
+    "RUF022",
+    # The parity dumpers deliberately catch broad exceptions: a pipeline that
+    # raises is part of what is being compared.
+    "B017",
+    # `X | None` needs Python 3.10; this package supports 3.9.
+    "UP045",
+    "UP007",
+]
+
+[lint.per-file-ignores]
+# The package re-exports the reference library's surface, so the imports in
+# `__init__.py` are the API rather than dead weight.
+"crates/webdataset-python/python/webdataset/__init__.py" = ["F401", "E402"]

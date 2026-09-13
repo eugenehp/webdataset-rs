@@ -1,0 +1,16 @@
+webdataset-rs
+=============
+
+This project is a Rust port of the Python `webdataset` library:
+
+    https://github.com/webdataset/webdataset
+
+That library is Copyright 2020 NVIDIA CORPORATION and is distributed under the
+BSD 3-Clause licence reproduced in LICENSE. This port is a derivative work: the
+format, the pipeline design, the decoder behaviour and the API shape are all
+taken from it, and in many places the behaviour is reproduced deliberately
+field for field. The LICENSE file retains the original copyright notice
+accordingly, and this project is distributed under the same terms.
+
+The shard fixtures under `testdata/` are copied unchanged from that project and
+are used to check that this implementation reads them identically.

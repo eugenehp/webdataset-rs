@@ -1,0 +1,45 @@
+# Rust build output. The bindings crate is outside the workspace, so it has a
+# target directory of its own that `/target` does not cover.
+/target
+/crates/webdataset-python/target
+**/*.rs.bk
+
+# `Cargo.lock` is committed: this workspace ships binaries, and a lock file is
+# what makes the MSRV job and the parity numbers reproducible.
+Cargo.lock.bak
+
+# maturin builds the extension straight into the Python source tree, so this
+# sits next to the code it belongs to rather than under a build directory.
+/crates/webdataset-python/python/webdataset/_native*.so
+/crates/webdataset-python/python/webdataset/_native*.pyd
+/crates/webdataset-python/python/webdataset.dylibs/
+
+# Wheels and sdists.
+/dist/
+/wheels/
+*.whl
+*.egg-info/
+
+# Python and tooling caches.
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.venv/
+venv/
+
+# Corpora built by `bench/make_corpus.py` and the parity runs. The shards in
+# `testdata/` are fixtures and *are* committed; these are regenerated.
+/corpus*/
+/bench/corpus*/
+
+# Criterion writes its reports under the workspace target directory, which is
+# already ignored; this covers the case of a relocated target.
+/criterion/
+
+# Editors and OS.
+.DS_Store
+*.swp
+.idea/
+.vscode/
